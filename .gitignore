@@ -1,0 +1,29 @@
+# 编译输出
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+
+# 打包产物
+dist/
+build/
+*.spec
+
+# 日志和配置
+*.log
+config.json
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows 系统文件
+Thumbs.db
+.DS_Store

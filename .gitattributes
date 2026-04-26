@@ -1,0 +1,10 @@
+# 设置文本文件的行尾符为 LF
+*.py text=auto eol=lf
+*.json text=auto eol=lf
+*.md text=auto eol=lf
+*.txt text=auto eol=lf
+
+# 设置二进制文件
+*.exe binary
+*.dll binary
+*.pyd binary
