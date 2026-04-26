@@ -6,16 +6,19 @@ Theme Scheduler - Windows Theme Auto Switcher
 """
 
 import sys
+from datetime import datetime
+
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTimeEdit, QMessageBox, QSystemTrayIcon, QMenu, QAction,
-    QGroupBox, QStatusBar
+    QApplication, QMainWindow, QWidget, QVBoxLayout, 
+    QMessageBox, QSystemTrayIcon, QMenu, QAction, QStatusBar
 )
-from PyQt5.QtCore import Qt, QTimer, QTime
+from PyQt5.QtCore import Qt, QTimer
 
 # 导入自定义模块
 from src.functions.config import load_config, save_config
 from src.functions.theme import get_current_theme, set_theme
+from src.components.ManualSwitchGroup import ManualSwitchGroup
+from src.components.ScheduleGroup import ScheduleGroup
 
 
 class MainWindow(QMainWindow):
@@ -30,7 +33,6 @@ class MainWindow(QMainWindow):
         self.schedule_timer.start(60000)
         
         self.init_ui()
-        self.load_schedule_settings()
 
     def init_ui(self):
         """初始化界面"""
@@ -45,10 +47,18 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(20, 20, 20, 20)
 
         # 手动切换区域
-        main_layout.addWidget(self.create_manual_switch_group())
+        self.manual_switch_group = ManualSwitchGroup()
+        self.manual_switch_group.update_theme_display(self.current_theme)
+        self.manual_switch_group.theme_switched.connect(self.manual_switch)
+        main_layout.addWidget(self.manual_switch_group)
         
         # 定时切换区域
-        main_layout.addWidget(self.create_schedule_group())
+        self.schedule_group = ScheduleGroup(self.config)
+        self.schedule_group.load_settings()
+        self.schedule_group.schedule_set.connect(self.set_schedule)
+        self.schedule_group.schedule_cancel.connect(self.cancel_schedule)
+        self.schedule_group.schedule_disable.connect(self.disable_schedule)
+        main_layout.addWidget(self.schedule_group)
 
         # 状态栏
         self.status_bar = QStatusBar()
@@ -57,117 +67,6 @@ class MainWindow(QMainWindow):
 
         # 系统托盘
         self.create_tray_icon()
-
-    def create_manual_switch_group(self):
-        """创建手动切换区域"""
-        group = QGroupBox("手动切换")
-        layout = QVBoxLayout(group)
-        
-        # 切换按钮
-        button_row = QHBoxLayout()
-        
-        self.light_button = QPushButton("切换到浅色模式")
-        self.light_button.clicked.connect(lambda: self.manual_switch(True))
-        self.light_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50; color: white;
-                padding: 12px 24px; border: none; border-radius: 8px;
-                font-size: 14px; font-weight: bold;
-            }
-            QPushButton:hover { background-color: #45a049; }
-        """)
-        button_row.addWidget(self.light_button)
-
-        self.dark_button = QPushButton("切换到深色模式")
-        self.dark_button.clicked.connect(lambda: self.manual_switch(False))
-        self.dark_button.setStyleSheet("""
-            QPushButton {
-                background-color: #555; color: white;
-                padding: 12px 24px; border: none; border-radius: 8px;
-                font-size: 14px; font-weight: bold;
-            }
-            QPushButton:hover { background-color: #444; }
-        """)
-        button_row.addWidget(self.dark_button)
-        
-        layout.addLayout(button_row)
-        
-        # 当前主题显示
-        theme_row = QHBoxLayout()
-        theme_row.addWidget(QLabel("当前主题:"))
-        self.current_theme_label = QLabel("浅色模式" if self.current_theme else "深色模式")
-        self.current_theme_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
-        theme_row.addWidget(self.current_theme_label)
-        theme_row.addStretch()
-        layout.addLayout(theme_row)
-        
-        return group
-
-    def create_schedule_group(self):
-        """创建定时切换区域"""
-        group = QGroupBox("定时自动切换")
-        layout = QVBoxLayout(group)
-        
-        # 深色时间设置
-        dark_row = QHBoxLayout()
-        dark_row.addWidget(QLabel("深色模式时间:"))
-        self.dark_time_edit = QTimeEdit()
-        self.dark_time_edit.setDisplayFormat("HH:mm")
-        self.dark_time_edit.setTime(QTime(19, 0))
-        dark_row.addWidget(self.dark_time_edit)
-        layout.addLayout(dark_row)
-
-        # 浅色时间设置
-        light_row = QHBoxLayout()
-        light_row.addWidget(QLabel("浅色模式时间:"))
-        self.light_time_edit = QTimeEdit()
-        self.light_time_edit.setDisplayFormat("HH:mm")
-        self.light_time_edit.setTime(QTime(7, 0))
-        light_row.addWidget(self.light_time_edit)
-        layout.addLayout(light_row)
-
-        # 操作按钮
-        button_row = QHBoxLayout()
-        
-        self.auto_button = QPushButton("自动设置")
-        self.auto_button.clicked.connect(self.set_schedule)
-        self.auto_button.setStyleSheet("""
-            QPushButton { background-color: #2196F3; color: white;
-                padding: 10px 20px; border: none; border-radius: 6px; font-size: 13px; }
-            QPushButton:hover { background-color: #1976D2; }
-        """)
-        button_row.addWidget(self.auto_button)
-
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.cancel_schedule)
-        self.cancel_button.setStyleSheet("""
-            QPushButton { background-color: #FF9800; color: white;
-                padding: 10px 20px; border: none; border-radius: 6px; font-size: 13px; }
-            QPushButton:hover { background-color: #F57C00; }
-        """)
-        button_row.addWidget(self.cancel_button)
-
-        self.disable_button = QPushButton("取消自动设置颜色模式")
-        self.disable_button.clicked.connect(self.disable_schedule)
-        self.disable_button.setStyleSheet("""
-            QPushButton { background-color: #f44336; color: white;
-                padding: 10px 16px; border: none; border-radius: 6px; font-size: 13px; }
-            QPushButton:hover { background-color: #d32f2f; }
-        """)
-        button_row.addWidget(self.disable_button)
-        
-        layout.addLayout(button_row)
-
-        # 状态显示
-        status_row = QHBoxLayout()
-        status_row.addWidget(QLabel("定时状态:"))
-        self.schedule_status_label = QLabel("未启用" if not self.config["auto_schedule"] else "已启用")
-        self.schedule_status_label.setStyleSheet("font-weight: bold; font-size: 13px;")
-        status_row.addWidget(self.schedule_status_label)
-        status_row.addStretch()
-        layout.addLayout(status_row)
-        
-        return group
 
     def create_tray_icon(self):
         """创建系统托盘图标"""
@@ -185,21 +84,6 @@ class MainWindow(QMainWindow):
         self.tray_icon.show()
         self.tray_icon.activated.connect(lambda r: self.show() if r == QSystemTrayIcon.DoubleClick else None)
 
-    def load_schedule_settings(self):
-        """加载保存的定时设置"""
-        dark_time = self.config["dark_time"].split(":")
-        light_time = self.config["light_time"].split(":")
-        
-        self.dark_time_edit.setTime(QTime(int(dark_time[0]), int(dark_time[1])))
-        self.light_time_edit.setTime(QTime(int(light_time[0]), int(light_time[1])))
-        
-        if self.config["auto_schedule"]:
-            self.schedule_status_label.setText("已启用")
-            self.schedule_status_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #28a745;")
-        else:
-            self.schedule_status_label.setText("未启用")
-            self.schedule_status_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #666;")
-
     def manual_switch(self, light):
         """手动切换主题"""
         if set_theme(light):
@@ -210,18 +94,14 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "切换失败", "无法切换主题，请检查权限")
 
-    def set_schedule(self):
+    def set_schedule(self, dark_time, light_time):
         """设置定时切换"""
-        dark_time = self.dark_time_edit.time().toString("HH:mm")
-        light_time = self.light_time_edit.time().toString("HH:mm")
-        
         self.config["dark_time"] = dark_time
         self.config["light_time"] = light_time
         self.config["auto_schedule"] = True
         
         if save_config(self.config):
-            self.schedule_status_label.setText("已启用")
-            self.schedule_status_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #28a745;")
+            self.schedule_group.update_status(True)
             self.status_bar.showMessage(f"定时已设置: {dark_time} 深色 / {light_time} 浅色", 3000)
             QMessageBox.information(self, "设置成功", f"定时已启用\n深色模式: {dark_time}\n浅色模式: {light_time}")
         else:
@@ -229,16 +109,14 @@ class MainWindow(QMainWindow):
 
     def cancel_schedule(self):
         """取消当前修改"""
-        self.dark_time_edit.setTime(QTime.fromString(self.config["dark_time"], "HH:mm"))
-        self.light_time_edit.setTime(QTime.fromString(self.config["light_time"], "HH:mm"))
+        self.schedule_group.reset_time_edits()
         self.status_bar.showMessage("已取消修改", 2000)
 
     def disable_schedule(self):
         """禁用定时切换"""
         self.config["auto_schedule"] = False
         if save_config(self.config):
-            self.schedule_status_label.setText("未启用")
-            self.schedule_status_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #666;")
+            self.schedule_group.update_status(False)
             self.status_bar.showMessage("已禁用定时切换", 3000)
             QMessageBox.information(self, "已禁用", "已取消自动设置颜色模式")
         else:
@@ -248,8 +126,6 @@ class MainWindow(QMainWindow):
         """检查定时任务"""
         if not self.config["auto_schedule"]:
             return
-        
-        from datetime import datetime
         
         now = datetime.now().time()
         dark_time = datetime.strptime(self.config["dark_time"], "%H:%M").time()
@@ -281,8 +157,8 @@ class MainWindow(QMainWindow):
     def update_status(self):
         """更新状态显示"""
         theme_text = "浅色模式" if self.current_theme else "深色模式"
-        self.current_theme_label.setText(theme_text)
         self.status_bar.showMessage(f"当前主题: {theme_text}")
+        self.manual_switch_group.update_theme_display(self.current_theme)
 
     def closeEvent(self, event):
         """关闭窗口"""
