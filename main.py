@@ -12,13 +12,27 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QMessageBox, QSystemTrayIcon, QMenu, QAction, QStatusBar
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
 
 # 导入自定义模块
 from src.functions.config import load_config, save_config
 from src.functions.theme import get_current_theme, set_theme
 from src.components.ManualSwitchGroup import ManualSwitchGroup
 from src.components.ScheduleGroup import ScheduleGroup
+
+
+class ThemeSwitchWorker(QThread):
+    """后台主题切换工作线程"""
+    switch_complete = pyqtSignal(bool, bool)  # (success, light)
+    
+    def __init__(self, light):
+        super().__init__()
+        self.light = light
+        
+    def run(self):
+        """执行主题切换"""
+        result = set_theme(self.light)
+        self.switch_complete.emit(result, self.light)
 
 
 class MainWindow(QMainWindow):
@@ -85,13 +99,26 @@ class MainWindow(QMainWindow):
         self.tray_icon.activated.connect(lambda r: self.show() if r == QSystemTrayIcon.DoubleClick else None)
 
     def manual_switch(self, light):
-        """手动切换主题"""
-        if set_theme(light):
-            self.current_theme = light
-            self.update_status()
-            theme_text = "浅色模式" if light else "深色模式"
-            self.tray_icon.showMessage("主题切换器", f"已切换至{theme_text}", QSystemTrayIcon.Information, 3000)
+        """手动切换主题 - 先立即更新UI，再在后台执行切换"""
+        # 立即更新UI显示
+        self.current_theme = light
+        self.update_status()
+        
+        # 在后台线程执行实际的主题切换
+        self.switch_worker = ThemeSwitchWorker(light)
+        self.switch_worker.switch_complete.connect(self.on_switch_complete)
+        self.switch_worker.start()
+        
+    def on_switch_complete(self, success, light):
+        """主题切换完成后的回调"""
+        theme_text = "浅色模式" if light else "深色模式"
+        if success:
+            # 移除系统通知，避免通知堆积
+            pass
         else:
+            # 切换失败，恢复UI显示
+            self.current_theme = not light
+            self.update_status()
             QMessageBox.warning(self, "切换失败", "无法切换主题，请检查权限")
 
     def set_schedule(self, dark_time, light_time):
@@ -151,7 +178,8 @@ class MainWindow(QMainWindow):
             self.current_theme = light
             self.update_status()
             theme_text = "浅色模式" if light else "深色模式"
-            self.tray_icon.showMessage("主题切换器", f"定时切换至{theme_text}", QSystemTrayIcon.Information, 3000)
+            # 移除系统通知，避免通知堆积
+            # self.tray_icon.showMessage("主题切换器", f"定时切换至{theme_text}", QSystemTrayIcon.Information, 3000)
             self.status_bar.showMessage(f"定时切换至{theme_text}", 3000)
 
     def update_status(self):
@@ -163,6 +191,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """关闭窗口"""
         self.schedule_timer.stop()
+        # 清理系统托盘图标，避免图标堆积
+        if hasattr(self, 'tray_icon'):
+            self.tray_icon.hide()
+            self.tray_icon.deleteLater()
         event.accept()
 
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ToggleSlider - 双选项切换滑块组件
-选中的选项有紫色背景，未选中的是白色背景
+ToggleSlider - 双选项切换组件（RadioButton 风格）
+使用两个 QRadioButton，仿 iPhone 设置界面风格
 """
 
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QRadioButton
 from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class ToggleSlider(QWidget):
-    """双选项切换滑块组件"""
+    """双选项切换组件（RadioButton 风格）"""
     clicked = pyqtSignal(bool)  # True 表示选中第一个选项（浅色），False 表示选中第二个选项（深色）
     
     def __init__(self, option1="浅色", option2="深色", parent=None):
@@ -25,126 +25,56 @@ class ToggleSlider(QWidget):
         """初始化界面"""
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(30)
         
-        # 设置固定大小
-        self.setFixedSize(120, 32)
+        # 浅色选项
+        light_layout = QHBoxLayout()
+        light_layout.setSpacing(8)
         
-        # 创建两个选项标签
-        self.label1 = QLabel(self.option1)
-        self.label1.setAlignment(Qt.AlignCenter)
-        self.label1.setFixedSize(60, 32)
-        self.label1.setStyleSheet("""
-            QLabel {
-                background-color: #9b59b6;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 6px 0 0 6px;
-            }
-            QLabel:hover {
-                background-color: #8e44ad;
-            }
-        """)
-        self.label1.mousePressEvent = self.on_label1_clicked
+        self.light_label = QLabel(self.option1)
+        self.light_label.setStyleSheet("font-size: 14px;")
         
-        self.label2 = QLabel(self.option2)
-        self.label2.setAlignment(Qt.AlignCenter)
-        self.label2.setFixedSize(60, 32)
-        self.label2.setStyleSheet("""
-            QLabel {
-                background-color: white;
-                color: #555;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 0 6px 6px 0;
-                border: 1px solid #ddd;
-            }
-            QLabel:hover {
-                background-color: #f5f5f5;
-            }
-        """)
-        self.label2.mousePressEvent = self.on_label2_clicked
+        self.light_radio = QRadioButton()
+        self.light_radio.setChecked(True)
+        self.light_radio.clicked.connect(self.on_light_clicked)
         
-        layout.addWidget(self.label1)
-        layout.addWidget(self.label2)
+        light_layout.addWidget(self.light_label)
+        light_layout.addWidget(self.light_radio)
+        layout.addLayout(light_layout)
         
-    def on_label1_clicked(self, event):
-        """点击第一个选项"""
-        if not self.checked:
+        # 深色选项
+        dark_layout = QHBoxLayout()
+        dark_layout.setSpacing(8)
+        
+        self.dark_label = QLabel(self.option2)
+        self.dark_label.setStyleSheet("font-size: 14px;")
+        
+        self.dark_radio = QRadioButton()
+        self.dark_radio.setChecked(False)
+        self.dark_radio.clicked.connect(self.on_dark_clicked)
+        
+        dark_layout.addWidget(self.dark_label)
+        dark_layout.addWidget(self.dark_radio)
+        layout.addLayout(dark_layout)
+        
+    def on_light_clicked(self, checked):
+        """点击浅色选项"""
+        if checked and not self.checked:
             self.checked = True
-            self.update_styles()
             self.clicked.emit(True)
         
-    def on_label2_clicked(self, event):
-        """点击第二个选项"""
-        if self.checked:
+    def on_dark_clicked(self, checked):
+        """点击深色选项"""
+        if checked and self.checked:
             self.checked = False
-            self.update_styles()
             self.clicked.emit(False)
-        
-    def update_styles(self):
-        """更新样式"""
-        if self.checked:
-            # 选中第一个选项（浅色）
-            self.label1.setStyleSheet("""
-                QLabel {
-                    background-color: #9b59b6;
-                    color: white;
-                    font-size: 14px;
-                    font-weight: bold;
-                    border-radius: 6px 0 0 6px;
-                }
-                QLabel:hover {
-                    background-color: #8e44ad;
-                }
-            """)
-            self.label2.setStyleSheet("""
-                QLabel {
-                    background-color: white;
-                    color: #555;
-                    font-size: 14px;
-                    font-weight: bold;
-                    border-radius: 0 6px 6px 0;
-                    border: 1px solid #ddd;
-                }
-                QLabel:hover {
-                    background-color: #f5f5f5;
-                }
-            """)
-        else:
-            # 选中第二个选项（深色）
-            self.label1.setStyleSheet("""
-                QLabel {
-                    background-color: white;
-                    color: #555;
-                    font-size: 14px;
-                    font-weight: bold;
-                    border-radius: 6px 0 0 6px;
-                    border: 1px solid #ddd;
-                }
-                QLabel:hover {
-                    background-color: #f5f5f5;
-                }
-            """)
-            self.label2.setStyleSheet("""
-                QLabel {
-                    background-color: #9b59b6;
-                    color: white;
-                    font-size: 14px;
-                    font-weight: bold;
-                    border-radius: 0 6px 6px 0;
-                }
-                QLabel:hover {
-                    background-color: #8e44ad;
-                }
-            """)
         
     def setChecked(self, value):
         """设置选中状态"""
         if self.checked != value:
             self.checked = value
-            self.update_styles()
+            self.light_radio.setChecked(value)
+            self.dark_radio.setChecked(not value)
         
     def isChecked(self):
         """获取选中状态"""
